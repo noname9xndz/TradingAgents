@@ -2,6 +2,7 @@ import type { ChildProcess } from "node:child_process";
 import { bridge, errorLine } from "./bridge";
 import { indexRun } from "./db";
 import { saveRun, type RunSource } from "./history";
+import { notifyDecision } from "./telegram";
 
 /** The run in progress (or the last one), kept on the server so a page that
  * reloads can attach to it again instead of losing it. One at a time: this is
@@ -42,6 +43,14 @@ function finish(run: Run) {
   run.child.kill();
   const last = run.events[run.events.length - 1] ?? "";
   const outcome: RunOutcome = /"type":\s*"done"/.test(last) ? "done" : /"type":"stopped"/.test(last) ? "stopped" : "error";
+  if (outcome === "done") {
+    const done = JSON.parse(last);
+    const start = run.events.map((line) => JSON.parse(line)).find((e) => e.type === "start") ?? {};
+    void notifyDecision(
+      { ticker: start.ticker ?? run.job.ticker, date: run.job.date, rating: done.rating, language: run.job.language, source: run.source },
+      done.sections?.final_trade_decision ?? "",
+    );
+  }
   store.tradingOnFinish?.(outcome, run.job, run.source);
 }
 

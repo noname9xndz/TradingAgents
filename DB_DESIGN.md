@@ -211,6 +211,7 @@ Dạng key–value, mỗi dòng lưu một giá trị JSON.
 |---|---|
 | `keys` | `{ "OPENROUTER_API_KEY": "sk-or-…", … }`: API key nhập trên trang Cài đặt. Chỉ nhận tên biến dạng `*_API_KEY` hoặc `*_USER_AGENT` |
 | `defaults` | `{ "provider", "quick", "deep", "backendUrl", "language", "depth", "analysts" }`: cấu hình mặc định cho form phân tích và job mới |
+| `telegram` | `{ "enabled", "botToken", "chatId" }`: thông báo Telegram. Khi một mã phân tích xong (`status = done`), web gửi quyết định cuối vào chat này. API chỉ trả `botToken` dạng `••••` kèm 4 ký tự cuối |
 
 - Khi chạy phân tích, key ở đây được đưa vào biến môi trường của tiến trình Python và **được ưu tiên hơn `.env`**.
 - API `/api/settings` không bao giờ trả giá trị key, chỉ trả dạng `••••` kèm 4 ký tự cuối.
