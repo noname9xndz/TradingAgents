@@ -12,6 +12,7 @@ from cli import updates
 from cli.display import (
     console,
 )
+from cli.i18n import set_language, t
 from cli.prefs import load_last_run, sanitize, save_last_run
 from cli.prompts import (
     ask_anthropic_effort,
@@ -143,10 +144,10 @@ def _prompt_selections(prefs, flags):
         updates.start_background_refresh()
 
     def create_question_box(title, prompt, default=None):
-        box_content = f"[bold]{title}[/bold]\n"
-        box_content += f"[dim]{prompt}[/dim]"
+        box_content = f"[bold]{t(title)}[/bold]\n"
+        box_content += f"[dim]{t(prompt)}[/dim]"
         if default:
-            box_content += f"\n[dim]Default: {default}[/dim]"
+            box_content += f"\n[dim]{t('Default')}: {default}[/dim]"
         return Panel(box_content, border_style="blue", padding=(1, 2))
 
     def thinking_value_or_prompt(env_var, config_key, label, box_title, box_body, prompt_fn):
@@ -213,6 +214,8 @@ def _prompt_selections(prefs, flags):
             )
         )
         output_language = ask_output_language(prefs.get("output_language"))
+    # The questions from here on are asked in the chosen language.
+    set_language(output_language)
 
     # Step 4: Select analysts
     prefs = sanitize(prefs, asset_type.value)
@@ -226,7 +229,7 @@ def _prompt_selections(prefs, flags):
         )
         selected_analysts = select_analysts(asset_type, prefs.get("analysts"))
     console.print(
-        f"[green]Selected analysts:[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
+        f"[green]{t('Selected analysts:')}[/green] {', '.join(analyst.value for analyst in selected_analysts)}"
     )
 
     # Step 5: Research depth (skipped when both round counts are set via env).
@@ -236,7 +239,7 @@ def _prompt_selections(prefs, flags):
     if depth_from_env():
         selected_research_depth = DEFAULT_CONFIG["max_debate_rounds"]
         console.print(
-            f"[green]✓ Research depth from environment:[/green] "
+            f"[green]✓ {t('Research depth from environment:')}[/green] "
             f"{DEFAULT_CONFIG['max_debate_rounds']} debate / "
             f"{DEFAULT_CONFIG['max_risk_discuss_rounds']} risk rounds"
         )
@@ -258,7 +261,7 @@ def _prompt_selections(prefs, flags):
         backend_url = resolve_backend_url(
             selected_llm_provider, env_url=DEFAULT_CONFIG["backend_url"]
         )
-        console.print(f"[green]✓ LLM provider from environment:[/green] {selected_llm_provider}")
+        console.print(f"[green]✓ {t('LLM provider from environment:')}[/green] {selected_llm_provider}")
         console.print(f"[green]✓ Backend URL:[/green] {backend_url}")
     else:
         console.print(
@@ -304,7 +307,7 @@ def _prompt_selections(prefs, flags):
         selected_shallow_thinker = DEFAULT_CONFIG["quick_think_llm"]
         selected_deep_thinker = DEFAULT_CONFIG["deep_think_llm"]
         console.print(
-            f"[green]✓ Thinking agents from environment:[/green] "
+            f"[green]✓ {t('Thinking agents from environment:')}[/green] "
             f"quick={selected_shallow_thinker}, deep={selected_deep_thinker}"
         )
     else:

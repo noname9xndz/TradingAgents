@@ -22,6 +22,7 @@ from cli.display import (
     update_display,
     update_research_team_status,
 )
+from cli.i18n import t
 from cli.selections import depth_from_env, get_user_selections, unattended_gaps
 from cli.stats_handler import StatsCallbackHandler
 from tradingagents.agents.rating import is_review, run_rating
@@ -390,7 +391,7 @@ def run_analysis(checkpoint: bool | None = None, portfolio=None, flags=None):
 
 
 def _yes(question: str) -> bool:
-    return typer.prompt(question, default="Y").strip().upper() in ("Y", "YES", "")
+    return typer.prompt(t(question), default="Y").strip().upper() in ("Y", "YES", "C", "CÓ", "CO", "")
 
 
 def _graphical_browser():
@@ -432,7 +433,7 @@ def _offer_reports(final_state, graph, ticker, save=None, show=None, html=None):
     """
     asked = save is None
     if asked:
-        save = typer.prompt("Save report?", default="Y").strip().upper() in ("Y", "YES", "")
+        save = _yes("Save report?")
     if save:
         # Under results_dir, not the working directory: in Docker the working
         # directory is inside the container and the report goes with it, while
@@ -440,7 +441,7 @@ def _offer_reports(final_state, graph, ticker, save=None, show=None, html=None):
         save_path = graph.default_report_path(ticker)
         if asked:   # someone at the prompt may pick another folder
             save_path = Path(typer.prompt(
-                "Save path (press Enter for default)", default=str(save_path)
+                t("Save path (press Enter for default)"), default=str(save_path)
             ).strip())
         if html is None:
             html = _yes("Also save it as an HTML page?") if asked else True
@@ -448,7 +449,7 @@ def _offer_reports(final_state, graph, ticker, save=None, show=None, html=None):
         try:
             report_file = graph.save_reports(final_state, ticker, save_path, html=html)
             saved = True
-            console.print(f"\n[green]✓ Report saved to:[/green] {save_path.resolve()}")
+            console.print(f"\n[green]✓ {t('Report saved to:')}[/green] {save_path.resolve()}")
             console.print(f"  [dim]Complete report:[/dim] {report_file.name}")
         except Exception as e:
             console.print(f"[red]Error saving report: {e}[/red]")
@@ -459,6 +460,6 @@ def _offer_reports(final_state, graph, ticker, save=None, show=None, html=None):
                 _open_page(page)
 
     if show is None:
-        show = typer.prompt("\nDisplay full report on screen?", default="Y").strip().upper() in ("Y", "YES", "")
+        show = _yes("\nDisplay full report on screen?")
     if show:
         display_complete_report(final_state)

@@ -1,0 +1,30 @@
+@import "tailwindcss";
+
+body {
+  background: #0b0f17;
+  color: #e2e8f0;
+}
+
+.field {
+  @apply w-full rounded-md border border-slate-700 bg-slate-900 px-3 py-2 text-sm outline-none focus:border-emerald-500;
+}
+
+.label {
+  @apply mb-1 block text-xs font-medium uppercase tracking-wide text-slate-400;
+}
+
+.report h1, .report h2, .report h3, .report h4 {
+  @apply mt-5 mb-2 font-semibold text-slate-100;
+}
+.report h1 { @apply text-xl; }
+.report h2 { @apply text-lg; }
+.report h3, .report h4 { @apply text-base; }
+.report p { @apply my-2 leading-7; }
+.report ul { @apply my-2 list-disc pl-6; }
+.report ol { @apply my-2 list-decimal pl-6; }
+.report li { @apply my-1; }
+.report strong { @apply text-slate-50; }
+.report code { @apply rounded bg-slate-800 px-1 text-sm; }
+.report table { @apply my-3 block overflow-x-auto text-sm; border-collapse: collapse; }
+.report th, .report td { @apply border border-slate-700 px-3 py-1.5 text-left align-top; }
+.report th { @apply bg-slate-800; }

@@ -10,6 +10,7 @@ from dotenv import find_dotenv, set_key
 from rich.markup import escape
 
 from cli.display import console
+from cli.i18n import t
 from cli.models import AnalystType, AssetType
 from tradingagents.llm_clients.api_key_env import get_api_key_env
 from tradingagents.llm_clients.model_catalog import get_model_options
@@ -162,14 +163,14 @@ def select_analysts(asset_type: AssetType = AssetType.STOCK, default=None) -> li
         asset_type,
     )
     choices = questionary.checkbox(
-        "Select Your [Analysts Team]:",
+        t("Select Your [Analysts Team]:"),
         choices=[
-            questionary.Choice(display, value=value, checked=value.value in (default or []))
+            questionary.Choice(t(display), value=value, checked=value.value in (default or []))
             for display, value in ANALYST_CHOICES
             if value in available_analysts
         ],
-        instruction="\n- Press Space to select/unselect analysts\n- Press 'a' to select/unselect all\n- Press Enter when done",
-        validate=lambda x: len(x) > 0 or "You must select at least one analyst.",
+        instruction=t("\n- Press Space to select/unselect analysts\n- Press 'a' to select/unselect all\n- Press Enter when done"),
+        validate=lambda x: len(x) > 0 or t("You must select at least one analyst."),
         style=questionary.Style(
             [
                 ("checkbox-selected", "fg:green"),
@@ -181,7 +182,7 @@ def select_analysts(asset_type: AssetType = AssetType.STOCK, default=None) -> li
     ).ask()
 
     if not choices:
-        console.print("\n[red]No analysts selected. Exiting...[/red]")
+        console.print(f"\n[red]{t('No analysts selected. Exiting...')}[/red]")
         exit(1)
 
     return choices
@@ -197,12 +198,12 @@ def select_research_depth(default=None) -> int:
     ]
 
     choice = questionary.select(
-        "Select Your [Research Depth]:",
+        t("Select Your [Research Depth]:"),
         choices=[
-            questionary.Choice(display, value=value) for display, value in DEPTH_OPTIONS
+            questionary.Choice(t(display), value=value) for display, value in DEPTH_OPTIONS
         ],
         default=_matching_choice(DEPTH_OPTIONS, default),
-        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
+        instruction=t("\n- Use arrow keys to navigate\n- Press Enter to select"),
         style=questionary.Style(
             [
                 ("selected", "fg:yellow noinherit"),
@@ -213,7 +214,7 @@ def select_research_depth(default=None) -> int:
     ).ask()
 
     if choice is None:
-        console.print("\n[red]No research depth selected. Exiting...[/red]")
+        console.print(f"\n[red]{t('No research depth selected. Exiting...')}[/red]")
         exit(1)
 
     return choice
@@ -257,23 +258,23 @@ def select_chatgpt_model(mode: str, default=None) -> str:
     except Exception as e:
         console.print(f"\n[yellow]Could not list your ChatGPT plan's models: {escape(str(e))}[/yellow]")
         models = []
-    return _select_listed_model(f"Select Your [{mode.title()}-Thinking] ChatGPT Plan Model:",
+    return _select_listed_model(t("Select Your [{mode}-Thinking] ChatGPT Plan Model:").format(mode=t(mode.title())),
                                 models, default, _prompt_custom_model_id)
 
 
 def _select_listed_model(title: str, models, default, custom) -> str:
     """Select from ``models`` ((name, model ID) pairs, listed live) or enter one with ``custom``."""
     choices = [questionary.Choice(name, value=mid) for name, mid in models]
-    choices.append(questionary.Choice("Custom model ID", value="custom"))
+    choices.append(questionary.Choice(t("Custom model ID"), value="custom"))
     choice = questionary.select(
         title,
         choices=choices,
         default=default if any(c.value == default for c in choices) else None,
-        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
+        instruction=t("\n- Use arrow keys to navigate\n- Press Enter to select"),
         style=_MENU_STYLE,
     ).ask()
     if choice is None:
-        console.print("\n[red]No model selected. Exiting...[/red]")
+        console.print(f"\n[red]{t('No model selected. Exiting...')}[/red]")
         exit(1)
     return custom() if choice == "custom" else choice
 
@@ -290,7 +291,7 @@ def _require_text(message: str, hint: str) -> str:
         validate=lambda x: len(x.strip()) > 0 or hint,
     ).ask()
     if response is None:
-        console.print("\n[red]Cancelled. Exiting...[/red]")
+        console.print(f"\n[red]{t('Cancelled. Exiting...')}[/red]")
         exit(1)
     return response.strip()
 
@@ -311,7 +312,7 @@ def select_openrouter_model(mode: str, default=None) -> str:
     ]
     top = (mainstream or models)[:5]
     return _select_listed_model(
-        f"Select Your [{mode.title()}-Thinking] OpenRouter Model (latest available):", top, default,
+        t("Select Your [{mode}-Thinking] OpenRouter Model (latest available):").format(mode=t(mode.title())), top, default,
         lambda: _require_text("Enter OpenRouter model ID (e.g. google/gemma-4-26b-a4b-it):",
                               "Please enter a model ID."))
 
@@ -322,7 +323,7 @@ LISTED_LIVE = {"openrouter": select_openrouter_model, "chatgpt": select_chatgpt_
 
 def _prompt_custom_model_id() -> str:
     """Prompt user to type a custom model ID."""
-    return _require_text("Enter model ID:", "Please enter a model ID.")
+    return _require_text(t("Enter model ID:"), t("Please enter a model ID."))
 
 
 def _select_model(provider: str, mode: str, default=None) -> str:
@@ -333,18 +334,18 @@ def _select_model(provider: str, mode: str, default=None) -> str:
 
     if provider.lower() == "azure":
         return _require_text(
-            f"Enter Azure deployment name ({mode}-thinking):",
-            "Please enter a deployment name.",
+            t("Enter Azure deployment name ({mode}-thinking):").format(mode=t(mode.title())),
+            t("Please enter a deployment name."),
         )
 
     choice = questionary.select(
-        f"Select Your [{mode.title()}-Thinking LLM Engine]:",
+        t("Select Your [{mode}-Thinking LLM Engine]:").format(mode=t(mode.title())),
         choices=[
             questionary.Choice(display, value=value)
             for display, value in get_model_options(provider, mode)
         ],
         default=_matching_choice(get_model_options(provider, mode), default),
-        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
+        instruction=t("\n- Use arrow keys to navigate\n- Press Enter to select"),
         style=_MENU_STYLE,
     ).ask()
 
@@ -455,32 +456,32 @@ def select_llm_provider(default=None) -> tuple[str, str | None]:
             continue
         choices.append(questionary.Choice(display, value=(provider_key, url)))
         if provider_key == "anthropic":
-            choices.append(questionary.Choice("Subscription (use your ChatGPT plan)", value=_SUBSCRIPTION))
+            choices.append(questionary.Choice(t("Subscription (use your ChatGPT plan)"), value=_SUBSCRIPTION))
     preselected = _SUBSCRIPTION if base in SIGNED_IN_PROVIDERS else next(
         ((key, url) for _, key, url in PROVIDERS if key == base), None
     )
 
     choice = questionary.select(
-        "Select your LLM Provider:",
+        t("Select your LLM Provider:"),
         choices=choices,
         default=preselected,
-        instruction="\n- Use arrow keys to navigate\n- Press Enter to select",
+        instruction=t("\n- Use arrow keys to navigate\n- Press Enter to select"),
         style=_MENU_STYLE,
     ).ask()
 
     if choice is None:
-        console.print("\n[red]No LLM provider selected. Exiting...[/red]")
+        console.print(f"\n[red]{t('No LLM provider selected. Exiting...')}[/red]")
         exit(1)
 
     if choice == _SUBSCRIPTION:
         choice = questionary.select(
-            "Select your subscription:",
+            t("Select your subscription:"),
             choices=[questionary.Choice(display, value=(key, url))
                      for display, key, url in PROVIDERS if key in SIGNED_IN_PROVIDERS],
             style=_MENU_STYLE,
         ).ask()
         if choice is None:
-            console.print("\n[red]No subscription selected. Exiting...[/red]")
+            console.print(f"\n[red]{t('No subscription selected. Exiting...')}[/red]")
             exit(1)
 
     provider, url = choice
@@ -490,12 +491,12 @@ def select_llm_provider(default=None) -> tuple[str, str | None]:
 def ask_openai_reasoning_effort() -> str:
     """Ask for OpenAI reasoning effort level."""
     choices = [
-        questionary.Choice("Medium (Default)", "medium"),
-        questionary.Choice("High (More thorough)", "high"),
-        questionary.Choice("Low (Faster)", "low"),
+        questionary.Choice(t("Medium (Default)"), "medium"),
+        questionary.Choice(t("High (More thorough)"), "high"),
+        questionary.Choice(t("Low (Faster)"), "low"),
     ]
     return questionary.select(
-        "Select Reasoning Effort:",
+        t("Select Reasoning Effort:"),
         choices=choices,
         style=questionary.Style([
             ("selected", "fg:cyan noinherit"),
@@ -513,11 +514,11 @@ def ask_anthropic_effort() -> str | None:
     common selection range.
     """
     return questionary.select(
-        "Select Effort Level:",
+        t("Select Effort Level:"),
         choices=[
-        questionary.Choice("High (recommended)", "high"),
-        questionary.Choice("Medium (balanced)", "medium"),
-        questionary.Choice("Low (faster, cheaper)", "low"),
+        questionary.Choice(t("High (recommended)"), "high"),
+        questionary.Choice(t("Medium (balanced)"), "medium"),
+        questionary.Choice(t("Low (faster, cheaper)"), "low"),
         ],
         style=questionary.Style([
             ("selected", "fg:cyan noinherit"),
@@ -534,10 +535,10 @@ def ask_gemini_thinking_config() -> str | None:
     Client maps to appropriate API param based on model series.
     """
     return questionary.select(
-        "Select Thinking Mode:",
+        t("Select Thinking Mode:"),
         choices=[
-        questionary.Choice("Enable Thinking (recommended)", "high"),
-        questionary.Choice("Minimal/Disable Thinking", "minimal"),
+        questionary.Choice(t("Enable Thinking (recommended)"), "high"),
+        questionary.Choice(t("Minimal/Disable Thinking"), "minimal"),
         ],
         style=questionary.Style([
             ("selected", "fg:green noinherit"),
@@ -554,7 +555,7 @@ def ask_glm_region() -> tuple[str, str]:
     accounts; keys aren't interchangeable. Returns (provider_key, backend_url).
     """
     return questionary.select(
-        "Select GLM platform:",
+        t("Select GLM platform:"),
         choices=[
             questionary.Choice(
                 "Z.AI — api.z.ai (international, uses ZHIPU_API_KEY)",
@@ -581,7 +582,7 @@ def ask_qwen_region() -> tuple[str, str]:
     (fixes #758). Returns (provider_key, backend_url).
     """
     return questionary.select(
-        "Select Qwen region:",
+        t("Select Qwen region:"),
         choices=[
             questionary.Choice(
                 "International — dashscope-intl.aliyuncs.com (uses DASHSCOPE_API_KEY)",
@@ -608,7 +609,7 @@ def ask_minimax_region() -> tuple[str, str]:
     (provider_key, backend_url).
     """
     return questionary.select(
-        "Select MiniMax region:",
+        t("Select MiniMax region:"),
         choices=[
             questionary.Choice(
                 "Global — api.minimax.io (uses MINIMAX_API_KEY)",
@@ -748,6 +749,7 @@ def ask_output_language(default=None) -> str:
     """
     choices = [
         questionary.Choice("English (default)", "English"),
+        questionary.Choice("Vietnamese (Tiếng Việt)", "Vietnamese"),
         questionary.Choice("Chinese (中文)", "Chinese"),
         questionary.Choice("Japanese (日本語)", "Japanese"),
         questionary.Choice("Korean (한국어)", "Korean"),
@@ -777,7 +779,7 @@ def ask_output_language(default=None) -> str:
         return "English"
     if choice == "custom":
         return (questionary.text(
-            "Enter language name (e.g. Turkish, Vietnamese, Thai, Indonesian):",
+            "Enter language name (e.g. Turkish, Thai, Indonesian):",
             validate=lambda x: len(x.strip()) > 0 or "Please enter a language name.",
         ).ask() or "").strip() or "English"
 

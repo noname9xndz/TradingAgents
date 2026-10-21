@@ -1,0 +1,6 @@
+# The repository's Python ignore list drops every lib/ folder; this one is source.
+!lib/
+node_modules/
+.next/
+next-env.d.ts
+*.tsbuildinfo

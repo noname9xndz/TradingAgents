@@ -8,6 +8,27 @@ services:
     tty: true
     stdin_open: true
 
+  # The web UI at http://127.0.0.1:3210: docker compose up web
+  # Its run history (web_history/ folders and history.db) lives in the same data
+  # volume as everything else, so it outlives the container.
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+    env_file:
+      - .env
+    ports:
+      - "127.0.0.1:3210:3210"
+    environment:
+      # Scheduled jobs run in this time zone.
+      - TZ=${TZ:-Asia/Ho_Chi_Minh}
+    # The scheduler only runs while the server does.
+    restart: unless-stopped
+    volumes:
+      - ${TRADINGAGENTS_DATA_DIR:-tradingagents_data}:/home/appuser/.tradingagents
+    profiles:
+      - web
+
   ollama:
     image: ollama/ollama:latest
     volumes:
