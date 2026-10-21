@@ -9,6 +9,7 @@ const NAV: [string, string][] = [
   ["/", "Lịch sử phân tích"],
   ["/queue", "Hàng chờ"],
   ["/jobs", "Lịch chạy"],
+  ["/backtest", "Backtest"],
   ["/guide", "Hướng dẫn"],
   ["/settings", "Cài đặt"],
 ];

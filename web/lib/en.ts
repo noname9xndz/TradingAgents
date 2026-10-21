@@ -238,4 +238,6 @@ export const EN: Record<string, string> = {
   "Không có mã nào đang chạy.": "Nothing is running.",
   "Đang chờ": "Waiting",
   "thêm lúc {time}": "added {time}",
+  "Backtest": "Backtest",
+  "Tính năng đang phát triển.": "This feature is under development.",
 };

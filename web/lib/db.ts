@@ -1,4 +1,4 @@
-import { mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
+import { chmodSync, mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
@@ -9,7 +9,8 @@ import { HISTORY_DIR, type RunMeta } from "./history";
  *   every row is read from them, so these rows can be deleted and rebuilt.
  * - ``jobs``: the scheduled jobs. Here they are the record.
  * - ``job_fires``: each time a job went off, by its schedule or by hand.
- * - ``queue``: runs waiting their turn, and the one running. A row is deleted when its run ends. */
+ * - ``queue``: runs waiting their turn, and the one running. A row is deleted when its run ends.
+ * - ``settings``: the settings page: API keys and defaults. The file is readable by its owner only. */
 export const DB_PATH =
   process.env.TRADINGAGENTS_HISTORY_DB || path.join(os.homedir(), ".tradingagents", "history.db");
 
@@ -71,6 +72,10 @@ CREATE TABLE IF NOT EXISTS queue (
   job TEXT NOT NULL,
   source TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS settings (
+  name TEXT PRIMARY KEY,
+  value TEXT NOT NULL
+);
 `;
 
 // Columns added after the first schema, for databases made before them.
@@ -97,6 +102,10 @@ function db(): DatabaseSync {
   if (!store.tradingDb) {
     mkdirSync(path.dirname(DB_PATH), { recursive: true });
     store.tradingDb = new DatabaseSync(DB_PATH);
+    // It holds API keys.
+    try {
+      chmodSync(DB_PATH, 0o600);
+    } catch {}
   }
   const conn = store.tradingDb;
   if (!ready) {
@@ -361,3 +370,32 @@ export const queueRemove = (id: string) => db().prepare("DELETE FROM queue WHERE
 export const queueFinish = () => db().prepare("DELETE FROM queue WHERE state = 'running'").run();
 /** After a restart nothing is running: a row left "running" was cut off and goes first in line again. */
 export const queueRequeueRunning = () => db().prepare("UPDATE queue SET state = 'waiting' WHERE state = 'running'").run();
+
+// --- Settings: one JSON value per name. ---
+
+/** Settings saved before they moved here, in web_settings.json, are imported once and the file set aside. */
+let settingsReady = false;
+function settingsDb(): DatabaseSync {
+  const conn = db();
+  if (!settingsReady) {
+    const file = process.env.TRADINGAGENTS_WEB_SETTINGS || path.join(path.dirname(DB_PATH), "web_settings.json");
+    try {
+      const old = JSON.parse(readFileSync(file, "utf-8"));
+      for (const name of ["keys", "defaults"]) if (old[name]) putSetting(name, old[name], conn);
+      renameSync(file, `${file}.imported`);
+    } catch {
+      // No old file.
+    }
+    settingsReady = true;
+  }
+  return conn;
+}
+
+export function getSetting<T>(name: string, fallback: T): T {
+  const row = settingsDb().prepare("SELECT value FROM settings WHERE name = ?").get(name) as { value: string } | undefined;
+  return row ? JSON.parse(row.value) : fallback;
+}
+
+export function putSetting(name: string, value: unknown, conn: DatabaseSync = settingsDb()) {
+  conn.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES (?, ?)").run(name, JSON.stringify(value));
+}

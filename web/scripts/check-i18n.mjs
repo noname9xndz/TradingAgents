@@ -3,7 +3,7 @@
 // Run: node scripts/check-i18n.mjs
 import { readFileSync } from "node:fs";
 
-const files = ["app/page.tsx", "components/Workspace.tsx", "app/settings/page.tsx", "components/Header.tsx", "app/queue/page.tsx", "app/jobs/page.tsx"];
+const files = ["app/page.tsx", "components/Workspace.tsx", "app/settings/page.tsx", "components/Header.tsx", "app/queue/page.tsx", "app/backtest/page.tsx", "app/jobs/page.tsx"];
 const keys = new Set();
 for (const file of files) {
   const source = readFileSync(file, "utf-8");
@@ -19,7 +19,7 @@ for (const [file] of Object.entries(DATA_FILES)) {
     for (const [, text] of block.matchAll(/"([^"]*[À-ỹĐđ][^"]*)"/g)) keys.add(text);
   }
 }
-for (const file of ["lib/shared.ts", "app/page.tsx", "app/settings/page.tsx", "components/Header.tsx", "app/queue/page.tsx", "app/jobs/page.tsx"]) {
+for (const file of ["lib/shared.ts", "app/page.tsx", "app/settings/page.tsx", "components/Header.tsx", "app/queue/page.tsx", "app/backtest/page.tsx", "app/jobs/page.tsx"]) {
   const source = readFileSync(file, "utf-8");
   for (const block of source.split(/\n(?=const |export const )/)) {
     if (!/^(export )?const (CATEGORIES|STATUS_LABEL|ANALYST_LABEL|DATA_KEYS|DEPTHS|NAV|DAYS)\b/.test(block)) continue;

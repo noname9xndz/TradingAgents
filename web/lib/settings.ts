@@ -1,11 +1,7 @@
-import { chmodSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
-import os from "node:os";
-import path from "node:path";
+import { getSetting, putSetting } from "./db";
 
 /** What the settings page keeps: API keys entered there, and the defaults a new
- * analysis starts from. In the data folder, so a container keeps it too. */
-export const SETTINGS_PATH =
-  process.env.TRADINGAGENTS_WEB_SETTINGS || path.join(os.homedir(), ".tradingagents", "web_settings.json");
+ * analysis starts from. In the settings table of history.db (lib/db.ts). */
 
 export type Defaults = {
   provider?: string;
@@ -23,19 +19,7 @@ type Settings = { keys: Record<string, string>; defaults: Defaults };
 const KEY_NAME = /^[A-Z][A-Z0-9_]*_(API_KEY|USER_AGENT)$/;
 
 export function readSettings(): Settings {
-  try {
-    const raw = JSON.parse(readFileSync(SETTINGS_PATH, "utf-8"));
-    return { keys: raw.keys ?? {}, defaults: raw.defaults ?? {} };
-  } catch {
-    return { keys: {}, defaults: {} };
-  }
-}
-
-function write(settings: Settings) {
-  mkdirSync(path.dirname(SETTINGS_PATH), { recursive: true });
-  // It holds API keys: readable by its owner only.
-  writeFileSync(SETTINGS_PATH, JSON.stringify(settings, null, 2), { encoding: "utf-8", mode: 0o600 });
-  chmodSync(SETTINGS_PATH, 0o600);
+  return { keys: getSetting("keys", {}), defaults: getSetting("defaults", {}) };
 }
 
 /** Set keys (an empty value removes one) and replace the defaults when given. */
@@ -47,8 +31,8 @@ export function updateSettings(keys: Record<string, string> = {}, defaults?: Def
     if (trimmed) settings.keys[name] = trimmed;
     else delete settings.keys[name];
   }
-  if (defaults) settings.defaults = defaults;
-  write(settings);
+  putSetting("keys", settings.keys);
+  if (defaults) putSetting("defaults", defaults);
 }
 
 /** The keys as the page may see them: never the value, only its last characters. */
