@@ -1,3 +1,4 @@
+import { recordError } from "./errors";
 import { getSetting, putSetting } from "./db";
 
 /** Telegram notice when a symbol's analysis finishes: only the final decision. Kept in the settings table. */
@@ -70,6 +71,6 @@ export async function notifyDecision(run: Parameters<typeof decisionMessage>[0],
   try {
     await sendTelegram(decisionMessage(run, decision || "—"), config);
   } catch (err) {
-    console.error("Telegram notice failed:", (err as Error).message);
+    recordError("telegram", err, { ticker: run.ticker });
   }
 }

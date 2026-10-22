@@ -1,3 +1,4 @@
+import { countErrorsSince } from "@/lib/db";
 import { enqueue, queued } from "@/lib/queue";
 import { currentRun, follow, isRunning, stopRun } from "@/lib/runs";
 
@@ -17,9 +18,11 @@ export async function GET(req: Request) {
   // ?status asks only whether a run is going, for the home page.
   if (new URL(req.url).searchParams.has("status")) {
     const waiting = queued().length;
-    if (!isRunning()) return Response.json({ running: false, waiting });
+    // Errors in the last 24 hours, for the header.
+    const errors = countErrorsSince(Date.now() - 86_400_000);
+    if (!isRunning()) return Response.json({ running: false, waiting, errors });
     const start = run!.events.map((line) => JSON.parse(line)).find((e) => e.type === "start") ?? {};
-    return Response.json({ running: true, ticker: start.ticker ?? run!.job?.ticker, date: start.date ?? run!.job?.date, waiting });
+    return Response.json({ running: true, ticker: start.ticker ?? run!.job?.ticker, date: start.date ?? run!.job?.date, waiting, errors });
   }
   // Only a run in progress: a finished one is in the history, and the page is free for a new one.
   if (!run || !isRunning()) return new Response(null, { status: 204 });

@@ -1,3 +1,4 @@
+import { recordError } from "./errors";
 import { queueAdd, queueFinish, queueRemove, queueRequeueRunning, queueTake, queueWaiting } from "./db";
 import type { RunSource } from "./history";
 import { isRunning, startRun, type RunOutcome } from "./runs";
@@ -38,7 +39,7 @@ export function startQueueWorker() {
     try {
       pump();
     } catch (err) {
-      console.error("Queue worker failed:", err);
+      recordError("queue", err);
     }
   }, 10_000);
 }

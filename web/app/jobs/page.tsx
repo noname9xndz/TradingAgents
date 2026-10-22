@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
+import TestModels from "@/components/TestModels";
 import { useI18n } from "@/lib/i18n";
 import type { Schedule } from "@/lib/schedule";
 import { CATEGORIES, RATING_STYLE } from "@/lib/shared";
@@ -390,6 +391,14 @@ export default function JobsPage() {
             )}
             {modelPicker(t("Model nhanh (analyst, trader, tranh luận)"), models.quick, quick, setQuick)}
             {modelPicker(t("Model sâu (các manager)"), models.deep, deep, setDeep)}
+            <div className="md:col-span-2">
+              <TestModels
+                provider={e.request.provider}
+                quick={quick[0] === "custom" ? quick[1] : quick[0]}
+                deep={deep[0] === "custom" ? deep[1] : deep[0]}
+                backendUrl={e.request.backendUrl}
+              />
+            </div>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">

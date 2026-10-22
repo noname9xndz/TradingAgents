@@ -9,7 +9,7 @@ const VENV_PYTHON = path.join(ROOT, ".venv", process.platform === "win32" ? "Scr
 const PYTHON = process.env.PYTHON || (existsSync(VENV_PYTHON) ? VENV_PYTHON : "python");
 
 /** Start `python -m cli.web_bridge <command>`; it writes one JSON object per line. */
-export function bridge(command: "options" | "run") {
+export function bridge(command: "options" | "run" | "ping") {
   const child = spawn(PYTHON, ["-m", "cli.web_bridge", command], {
     cwd: ROOT,
     // Keys saved on the settings page reach Python as environment variables;

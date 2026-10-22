@@ -2,6 +2,7 @@ import { chmodSync, mkdirSync, readdirSync, readFileSync, renameSync } from "nod
 import os from "node:os";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
+import { errorKind } from "./error-kinds";
 import { HISTORY_DIR, type RunMeta } from "./history";
 
 /** The web app's database.
@@ -10,7 +11,8 @@ import { HISTORY_DIR, type RunMeta } from "./history";
  * - ``jobs``: the scheduled jobs. Here they are the record.
  * - ``job_fires``: each time a job went off, by its schedule or by hand.
  * - ``queue``: runs waiting their turn, and the one running. A row is deleted when its run ends.
- * - ``settings``: the settings page: API keys and defaults. The file is readable by its owner only. */
+ * - ``settings``: the settings page: API keys and defaults. The file is readable by its owner only.
+ * - ``errors``: the error log: failed analyses and failures of the server's own parts. */
 export const DB_PATH =
   process.env.TRADINGAGENTS_HISTORY_DB || path.join(os.homedir(), ".tradingagents", "history.db");
 
@@ -76,6 +78,19 @@ CREATE TABLE IF NOT EXISTS settings (
   name TEXT PRIMARY KEY,
   value TEXT NOT NULL
 );
+CREATE TABLE IF NOT EXISTS errors (
+  id INTEGER PRIMARY KEY AUTOINCREMENT,
+  at INTEGER NOT NULL,
+  scope TEXT NOT NULL, -- run / scheduler / queue / history / telegram
+  kind TEXT NOT NULL, -- lib/error-kinds.ts
+  message TEXT NOT NULL,
+  detail TEXT,
+  run_id TEXT,
+  ticker TEXT,
+  job_id TEXT,
+  job_name TEXT
+);
+CREATE INDEX IF NOT EXISTS errors_at ON errors (at);
 `;
 
 // Columns added after the first schema, for databases made before them.
@@ -116,6 +131,7 @@ function db(): DatabaseSync {
     for (const [name, type] of missing) conn.exec(`ALTER TABLE runs ADD COLUMN ${name} ${type}`);
     if (missing.length) conn.exec("DELETE FROM runs");
     syncAll(conn);
+    backfillErrors(conn);
     ready = true;
   }
   return conn;
@@ -399,3 +415,65 @@ export function getSetting<T>(name: string, fallback: T): T {
 export function putSetting(name: string, value: unknown, conn: DatabaseSync = settingsDb()) {
   conn.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES (?, ?)").run(name, JSON.stringify(value));
 }
+
+// --- The error log. ---
+
+export type ErrorRow = {
+  id: number;
+  at: number;
+  scope: string;
+  kind: string;
+  message: string;
+  detail?: string | null;
+  runId?: string | null;
+  ticker?: string | null;
+  jobId?: string | null;
+  jobName?: string | null;
+};
+
+export function insertError(e: Omit<ErrorRow, "id">, conn: DatabaseSync = db()) {
+  conn
+    .prepare("INSERT INTO errors (at, scope, kind, message, detail, run_id, ticker, job_id, job_name) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)")
+    .run(e.at, e.scope, e.kind, e.message, e.detail ?? null, e.runId ?? null, e.ticker ?? null, e.jobId ?? null, e.jobName ?? null);
+}
+
+/** Failed runs saved before the log existed go in once. */
+function backfillErrors(conn: DatabaseSync) {
+  if (conn.prepare("SELECT 1 FROM settings WHERE name = 'errors_backfilled'").get()) return;
+  const failed = conn.prepare("SELECT id, ticker, error, ended_at, started_at, job_id, job_name FROM runs WHERE status = 'error'").all() as any[];
+  for (const r of failed) {
+    const message = r.error ?? "Lỗi không rõ";
+    insertError(
+      { at: r.ended_at ?? r.started_at, scope: "run", kind: errorKind(message), message, runId: r.id, ticker: r.ticker, jobId: r.job_id, jobName: r.job_name },
+      conn,
+    );
+  }
+  conn.prepare("INSERT OR REPLACE INTO settings (name, value) VALUES ('errors_backfilled', 'true')").run();
+}
+
+export type ErrorFilter = { scope?: string; kind?: string; from?: number; page?: number; pageSize?: number };
+
+/** The log, newest first, a page at a time. */
+export function queryErrors(f: ErrorFilter) {
+  const where: string[] = [];
+  const args: (string | number)[] = [];
+  if (f.scope) where.push("scope = ?"), args.push(f.scope);
+  if (f.kind) where.push("kind = ?"), args.push(f.kind);
+  if (f.from) where.push("at >= ?"), args.push(f.from);
+  const clause = where.length ? `WHERE ${where.join(" AND ")}` : "";
+  const pageSize = Math.min(Math.max(f.pageSize ?? 50, 1), 200);
+  const page = Math.max(f.page ?? 1, 1);
+  const conn = db();
+  const total = (conn.prepare(`SELECT COUNT(*) AS n FROM errors ${clause}`).get(...args) as { n: number }).n;
+  const rows = conn
+    .prepare(
+      `SELECT id, at, scope, kind, message, detail, run_id AS runId, ticker, job_id AS jobId, job_name AS jobName
+       FROM errors ${clause} ORDER BY at DESC, id DESC LIMIT ? OFFSET ?`,
+    )
+    .all(...args, pageSize, (page - 1) * pageSize) as ErrorRow[];
+  return { errors: rows, total, page, pageSize };
+}
+
+export const countErrorsSince = (since: number) => (db().prepare("SELECT COUNT(*) AS n FROM errors WHERE at >= ?").get(since) as { n: number }).n;
+
+export const clearErrors = () => db().exec("DELETE FROM errors");

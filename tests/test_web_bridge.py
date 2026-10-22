@@ -5,6 +5,7 @@ from cli.web_bridge import (
     asset_type_of,
     files_statements,
     new_turns,
+    ping,
     run_settings,
     sections,
     token_section,
@@ -77,3 +78,30 @@ def test_sections_flattens_nested_debate_state_and_drops_empty_ones():
         "risk_debate_state": None,
     }
     assert sections(state) == {"market_report": "up", "bull_history": "Bull Analyst: buy"}
+
+
+@pytest.mark.unit
+def test_ping_calls_each_distinct_model_once_and_reports_failures(monkeypatch):
+    calls = []
+
+    class Reply:
+        content = "OK"
+
+    class Client:
+        def __init__(self, model):
+            self.model = model
+
+        def get_llm(self):
+            return self
+
+        def invoke(self, prompt):
+            calls.append(self.model)
+            if self.model == "bad":
+                raise ValueError("bad is not a valid model ID")
+            return Reply()
+
+    monkeypatch.setattr("tradingagents.llm_clients.create_tier_client", lambda config, tier: Client(config[f"{tier}_think_llm"]))
+    same = ping({"provider": "openrouter", "quick": "m", "deep": "m"})["results"]
+    assert calls == ["m"] and [r["ok"] for r in same] == [True, True] and [r["tier"] for r in same] == ["quick", "deep"]
+    mixed = ping({"provider": "openrouter", "quick": "m", "deep": "bad"})["results"]
+    assert mixed[0]["ok"] and not mixed[1]["ok"] and "not a valid model" in mixed[1]["error"]

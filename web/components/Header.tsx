@@ -10,6 +10,7 @@ const NAV: [string, string][] = [
   ["/queue", "Hàng chờ"],
   ["/jobs", "Lịch chạy"],
   ["/backtest", "Backtest"],
+  ["/errors", "Nhật ký lỗi"],
   ["/guide", "Hướng dẫn"],
   ["/settings", "Cài đặt"],
 ];
@@ -30,7 +31,7 @@ function Logo() {
 export default function Header() {
   const { t } = useI18n();
   const path = usePathname();
-  const [live, setLive] = useState<{ running: boolean; ticker?: string; waiting?: number }>({ running: false });
+  const [live, setLive] = useState<{ running: boolean; ticker?: string; waiting?: number; errors?: number }>({ running: false });
 
   useEffect(() => {
     const check = () =>
@@ -69,6 +70,11 @@ export default function Header() {
               {t(label)}
               {href === "/queue" && live.waiting ? (
                 <span className="ml-1.5 rounded-full bg-emerald-700 px-1.5 text-[11px] text-white">{live.waiting}</span>
+              ) : null}
+              {href === "/errors" && live.errors ? (
+                <span className="ml-1.5 rounded-full bg-red-700 px-1.5 text-[11px] text-white" title={t("lỗi trong 24 giờ qua")}>
+                  {live.errors}
+                </span>
               ) : null}
             </Link>
           ))}

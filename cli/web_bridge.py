@@ -11,7 +11,9 @@ import json
 import os
 import sys
 import threading
+import time
 import traceback
+import warnings
 
 from langchain_core.callbacks import BaseCallbackHandler
 from langchain_core.messages import AIMessageChunk
@@ -190,6 +192,14 @@ NODE_SECTIONS = {
 }
 
 
+SECTION_AGENTS = {section: node for node, section in NODE_SECTIONS.items()}
+
+
+def log(text: str) -> None:
+    """A readable line in the server log (docker logs): stdout carries the event protocol."""
+    print(text, file=sys.stderr, flush=True)
+
+
 def token_section(namespace: tuple, metadata: dict) -> str | None:
     """The section a streamed token belongs to: an analyst's subgraph names it in
     the namespace ("Market Analyst:<id>"), any other node in its metadata."""
@@ -322,11 +332,13 @@ def run(job: dict) -> None:
                     seen.add(call.get("id"))
                     emit({"type": "tool", "name": call["name"], "args": call.get("args", {}),
                           "analyst": owners.get(call["name"])})
+                    log(f"[{ticker}] {owners.get(call['name']) or 'agent'} → {call['name']}({call.get('args', {})})")
         if state:
             final_state.update(state)
             found = sections(state)
             for name, text in new_turns(shown, found):
                 emit({"type": "turn", "section": name, "text": text})
+                log(f"\n===== [{ticker}] {SECTION_AGENTS.get(name, name)} =====\n{text}\n")
             shown.update(found)
             if found:
                 emit({"type": "update", "sections": found})
@@ -337,20 +349,54 @@ def run(job: dict) -> None:
           "reportPath": str(report.parent.resolve())})
 
 
+def ping(job: dict) -> dict:
+    """Call each model tier once with a tiny prompt, the way an analysis builds it."""
+    from tradingagents.llm_clients import create_tier_client
+
+    config = DEFAULT_CONFIG.copy()
+    config.update({
+        "llm_provider": job["provider"],
+        "quick_think_llm": job["quick"],
+        "deep_think_llm": job["deep"],
+        "backend_url": job.get("backendUrl") or None,
+    })
+    results, tried = [], {}
+    for tier in ("quick", "deep"):
+        model = config[f"{tier}_think_llm"]
+        # The same model in both tiers is called once.
+        if model in tried:
+            results.append({**tried[model], "tier": tier})
+            continue
+        started = time.monotonic()
+        try:
+            reply = create_tier_client(config, tier).get_llm().invoke("Reply with the single word OK.")
+            result = {"ok": True, "reply": _text(reply.content)[:200]}
+        except Exception as exc:
+            result = {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
+        result.update({"tier": tier, "model": model, "ms": round((time.monotonic() - started) * 1000)})
+        tried[model] = result
+        results.append(result)
+    return {"type": "ping", "results": results}
+
+
 def main() -> None:
     global _out
     # Libraries that print would break the line protocol; their output goes to stderr.
     _out = sys.stdout
     _out.reconfigure(encoding="utf-8")
     sys.stdout = sys.stderr
+    # yfinance's pandas deprecation notices would bury the agents' turns in the log.
+    warnings.filterwarnings("ignore", message=".*inplace keyword.*")
     command = sys.argv[1] if len(sys.argv) > 1 else ""
     try:
         if command == "options":
             emit(options())
         elif command == "run":
             run(json.loads(sys.stdin.buffer.read().decode("utf-8")))
+        elif command == "ping":
+            emit(ping(json.loads(sys.stdin.buffer.read().decode("utf-8"))))
         else:
-            raise SystemExit("usage: python -m cli.web_bridge options|run")
+            raise SystemExit("usage: python -m cli.web_bridge options|run|ping")
     except Exception as exc:
         traceback.print_exc()
         emit({"type": "error", "message": f"{type(exc).__name__}: {exc}"})

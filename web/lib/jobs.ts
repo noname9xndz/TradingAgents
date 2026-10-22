@@ -1,3 +1,4 @@
+import { recordError } from "./errors";
 import { listFires, listJobs, logFire, putJob, removeJob } from "./db";
 import { enqueue, queued } from "./queue";
 import { currentRun, isRunning } from "./runs";
@@ -104,7 +105,7 @@ export function startScheduler() {
     try {
       tick();
     } catch (err) {
-      console.error("Scheduler tick failed:", err);
+      recordError("scheduler", err);
     }
   }, 30_000);
 }

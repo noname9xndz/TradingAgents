@@ -37,6 +37,7 @@ Web lưu dữ liệu trong một file SQLite là **`history.db`**, đặt trong 
 | `job_fires` | Nhật ký mỗi lần một job được kích hoạt | Có |
 | `queue` | Hàng chờ chạy, mỗi lúc một mã | Có (dữ liệu tạm: chạy xong thì xoá) |
 | `settings` | API key và cấu hình mặc định của trang Cài đặt | Có |
+| `errors` | Nhật ký lỗi: lần chạy lỗi, lỗi lịch chạy, hàng chờ, Telegram | Có |
 
 Ghi chú chung:
 - Mọi thời điểm là **epoch milliseconds** (`INTEGER`), theo kiểu `Date.now()` của JS.
@@ -217,6 +218,30 @@ Dạng key–value, mỗi dòng lưu một giá trị JSON.
 - API `/api/settings` không bao giờ trả giá trị key, chỉ trả dạng `••••` kèm 4 ký tự cuối.
 - Trên Linux/Docker, file DB được đặt quyền `0600`. Trên Windows hoặc khi mount thư mục từ Windows thì quyền này không có tác dụng.
 - **Vì DB chứa key, giữ bản sao lưu `history.db` ở nơi an toàn.**
+
+---
+
+## `errors` – nhật ký lỗi
+
+Mỗi lỗi là một dòng: lần phân tích bị lỗi, và lỗi của các phần chạy nền (lịch chạy, hàng chờ, lưu lịch sử, Telegram). Trang **Nhật ký lỗi** đọc từ bảng này ([web/lib/errors.ts](web/lib/errors.ts)).
+
+| Cột | Kiểu | Ý nghĩa |
+|---|---|---|
+| `id` | INTEGER PK AUTOINCREMENT | |
+| `at` | INTEGER NOT NULL | Lúc xảy ra lỗi |
+| `scope` | TEXT NOT NULL | `run`, `scheduler`, `queue`, `history` hoặc `telegram` |
+| `kind` | TEXT NOT NULL | Loại lỗi, phân loại tự động ([web/lib/error-kinds.ts](web/lib/error-kinds.ts)): `model`, `auth`, `quota`, `rate`, `network`, `data`, `process`, `other` |
+| `message` | TEXT NOT NULL | Thông báo lỗi |
+| `detail` | TEXT | Phần cuối log lỗi của Python (traceback) hoặc stack |
+| `run_id` | TEXT | Lần chạy bị lỗi (`runs.id`), nếu có |
+| `ticker` | TEXT | Mã đang chạy |
+| `job_id` | TEXT | Job sinh ra lần chạy, nếu có |
+| `job_name` | TEXT | Tên job |
+
+Index: `(at)`.
+
+- Lúc tạo bảng lần đầu, các lần chạy lỗi đã có trong `runs` được tự nhập vào **một lần**. Dòng `errors_backfilled` trong `settings` đánh dấu việc này, nên xoá nhật ký rồi khởi động lại thì các lỗi cũ không quay lại.
+- `/api/run?status` trả thêm số lỗi trong 24 giờ qua, để header hiện số trên tab.
 
 ---
 

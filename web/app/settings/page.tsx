@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import TestModels from "@/components/TestModels";
 import { useI18n } from "@/lib/i18n";
 
 type ModelList = [string, string][];
@@ -64,6 +65,7 @@ export default function SettingsPage() {
   const [quick, setQuick] = useState<[string, string]>(["", ""]);
   const [deep, setDeep] = useState<[string, string]>(["", ""]);
   const [message, setMessage] = useState("");
+  const [tests, setTests] = useState<Record<string, { busy?: boolean; ok?: boolean; message?: string }>>({});
   const [tab, setTab] = useState<"general" | "telegram">("general");
   const [telegram, setTelegram] = useState({
     enabled: false,
@@ -158,7 +160,17 @@ export default function SettingsPage() {
       },
     );
 
-  const keyRow = (env: string, label: string, readyElsewhere: boolean) => (
+  async function testKey(env: string) {
+    setTests({ ...tests, [env]: { busy: true } });
+    const res = await fetch("/api/settings/test-key", {
+      method: "POST",
+      body: JSON.stringify({ name: env, value: entered[env] ?? "" }),
+    });
+    const out = await res.json().catch(() => ({ ok: false, message: `HTTP ${res.status}` }));
+    setTests((prev) => ({ ...prev, [env]: out }));
+  }
+
+  const keyRow = (env: string, label: string, readyElsewhere: boolean, testable = false) => (
     <div
       key={env}
       className="grid items-center gap-2 border-t border-slate-800 py-3 md:grid-cols-[1fr_1.2fr_auto]"
@@ -189,6 +201,16 @@ export default function SettingsPage() {
         >
           {t("Lưu")}
         </button>
+        {testable && (
+          <button
+            className="rounded-md border border-sky-800 px-3 py-2 text-sm text-sky-300 hover:bg-sky-950 disabled:opacity-40"
+            disabled={tests[env]?.busy}
+            title={t("Kiểm tra giá trị đang nhập, hoặc giá trị đã lưu")}
+            onClick={() => testKey(env)}
+          >
+            {tests[env]?.busy ? "…" : t("Kiểm tra")}
+          </button>
+        )}
         {masked[env] && (
           <button
             className="rounded-md border border-slate-700 px-3 py-2 text-sm hover:bg-slate-800"
@@ -198,6 +220,11 @@ export default function SettingsPage() {
           </button>
         )}
       </div>
+      {tests[env]?.message && (
+        <div className={`text-xs md:col-span-3 ${tests[env].ok ? "text-emerald-300" : "text-red-300"}`}>
+          {tests[env].ok ? "✅" : "❌"} {t(tests[env].message!)}
+        </div>
+      )}
     </div>
   );
 
@@ -407,6 +434,16 @@ export default function SettingsPage() {
                   deep,
                   setDeep,
                 )}
+              {defaults.provider && (
+                <div className="md:col-span-2">
+                  <TestModels
+                    provider={defaults.provider}
+                    quick={quick[0] === "custom" ? quick[1] : quick[0]}
+                    deep={deep[0] === "custom" ? deep[1] : deep[0]}
+                    backendUrl={defaults.backendUrl}
+                  />
+                </div>
+              )}
               <div>
                 <label className="label">{t("Ngôn ngữ báo cáo")}</label>
                 <select
@@ -508,7 +545,7 @@ export default function SettingsPage() {
             <h3 className="mt-6 text-sm font-semibold text-slate-300">
               {t("Nguồn dữ liệu")}
             </h3>
-            {DATA_KEYS.map(([env, label]) => keyRow(env, t(label), false))}
+            {DATA_KEYS.map(([env, label]) => keyRow(env, t(label), false, true))}
           </section>
         </>
       )}

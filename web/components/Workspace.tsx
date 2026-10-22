@@ -5,6 +5,7 @@ import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import TestModels from "@/components/TestModels";
 import { useI18n } from "@/lib/i18n";
 import { CATEGORIES, CATEGORY_LABEL, RATING_STYLE, fmtTokens, type RunMeta, type Usage } from "@/lib/shared";
 
@@ -758,6 +759,12 @@ export default function Workspace({ runId }: { runId?: string }) {
 
         {modelPicker("quick", t("Model nhanh (analyst, trader, tranh luận)"))}
         {modelPicker("deep", t("Model sâu (các manager)"))}
+        <TestModels
+          provider={form.provider}
+          quick={form.quick === "custom" ? form.quickCustom : form.quick}
+          deep={form.deep === "custom" ? form.deepCustom : form.deep}
+          backendUrl={form.backendUrl}
+        />
 
         {running && (
           <button

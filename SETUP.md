@@ -19,6 +19,15 @@ cd TradingAgents
 git checkout dev-local
 ```
 
+> **Windows, cách nhanh:** sau khi có repo, bấm đúp **`setup.cmd`** ở thư mục gốc. File này làm hết các bước 3–4:
+> - kiểm tra Docker;
+> - tạo `.env` và hỏi key OpenRouter;
+> - bật thư mục `./data`;
+> - build và chạy container;
+> - mở trình duyệt.
+>
+> Chạy lại file này bao nhiêu lần cũng được, ví dụ sau mỗi lần `git pull`.
+
 ## 3. Tạo file `.env`
 
 ```bash

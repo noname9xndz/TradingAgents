@@ -2,6 +2,7 @@ import type { ChildProcess } from "node:child_process";
 import { bridge, errorLine } from "./bridge";
 import { indexRun } from "./db";
 import { saveRun, type RunSource } from "./history";
+import { recordError } from "./errors";
 import { notifyDecision } from "./telegram";
 
 /** The run in progress (or the last one), kept on the server so a page that
@@ -14,6 +15,7 @@ type Run = {
   finished: boolean;
   job: any;
   source: RunSource;
+  stderr: string; // the end of Python's error output, for the error log
 };
 
 export type RunOutcome = "done" | "error" | "stopped";
@@ -32,10 +34,12 @@ function finish(run: Run) {
   if (run.finished) return;
   run.finished = true;
   // The folder is the record; the database row is read back from it.
+  let runId: string | undefined;
   try {
-    indexRun(saveRun(run.job, run.events, run.source));
+    runId = saveRun(run.job, run.events, run.source);
+    indexRun(runId);
   } catch (err) {
-    console.error("Could not save the run to history:", err);
+    recordError("history", err, { ticker: run.job?.ticker });
   }
   for (const listener of run.listeners) listener("");
   run.listeners.clear();
@@ -43,6 +47,15 @@ function finish(run: Run) {
   run.child.kill();
   const last = run.events[run.events.length - 1] ?? "";
   const outcome: RunOutcome = /"type":\s*"done"/.test(last) ? "done" : /"type":"stopped"/.test(last) ? "stopped" : "error";
+  if (outcome === "error") {
+    const failed = JSON.parse(last);
+    recordError("run", failed.message ?? "Lỗi không rõ", {
+      detail: run.stderr.trim() || undefined,
+      runId,
+      ticker: run.job?.ticker,
+      ...(run.source.type === "job" ? { jobId: run.source.jobId, jobName: run.source.jobName } : {}),
+    });
+  }
   if (outcome === "done") {
     const done = JSON.parse(last);
     const start = run.events.map((line) => JSON.parse(line)).find((e) => e.type === "start") ?? {};
@@ -57,7 +70,9 @@ function finish(run: Run) {
 /** Start a run now; use lib/queue.ts to start one when the current one is done. */
 export function startRun(job: any, source: RunSource = { type: "manual" }) {
   const child = bridge("run");
-  const run: Run = { events: [], listeners: new Set(), child, finished: false, job, source };
+  const run: Run = { events: [], listeners: new Set(), child, finished: false, job, source, stderr: "" };
+  // Keep the last part only: a traceback ends there.
+  child.stderr!.on("data", (chunk: Buffer) => (run.stderr = (run.stderr + chunk.toString("utf-8")).slice(-6000)));
   store.tradingRun = run;
 
   const push = (line: string) => {
